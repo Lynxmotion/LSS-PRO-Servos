@@ -1,35 +1,27 @@
 #include "Wire.h"
-
 #define I2C_addr 0x50
 
 TwoWire I2C(PC9, PA8);
-
 #define Wire I2C
 
 uint8_t mem_addr = 0;
 
-
-void setup() {
+void setup() 
+{
   // put your setup code here, to run once:
   Wire.begin();
 
   //Wire.setClock(400000);
-
   pinMode(PA10, OUTPUT);
   digitalWrite(PA10, LOW);
-
-  
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-
+void loop()
+{
   Serial.println("Memory address");
   Serial.println(mem_addr);
 
-  /*
-     Read selective address at byte
-  */
+  // Read selective address at byte
   Wire.beginTransmission(I2C_addr);
 
   Wire.write((mem_addr) >> 8);
@@ -46,10 +38,7 @@ void loop() {
     Serial.println(Wire.read());
   }
 
-
-  /*
-     Write to mem_addr
-  */
+  // Write to mem_addr
   Wire.beginTransmission(I2C_addr);
 
   Wire.write((mem_addr) >> 8);
@@ -62,10 +51,7 @@ void loop() {
 
   delay(10);
 
-
-  /*
-     Read address at byte
-  */
+  // Read address at byte
   Wire.beginTransmission(I2C_addr);
 
   Wire.write((mem_addr) >> 8);
@@ -81,7 +67,6 @@ void loop() {
     Serial.println("Byte after update");
     Serial.println(Wire.read());
   }
-
 
   mem_addr++;
 
