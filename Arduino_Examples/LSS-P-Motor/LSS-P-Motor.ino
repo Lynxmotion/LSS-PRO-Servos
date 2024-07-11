@@ -1,78 +1,68 @@
-#include <SPI.h>
+/**
+ * Author Teemu Mäntykallio
+ * Initializes the library and runs the stepper
+ * motor in alternating directions.
+ * https://www.arduino.cc/reference/en/libraries/tmcstepper/
+ */
 
-int chipCS = PA4;
-const byte STEPOUT = PC7;
-int enable = PC11;
+#include <TMCStepper.h>
 
-#define EN_PIN           PC11 // Enable
-#define DIR_PIN          PC8  // Direction
-#define STEP_PIN         PC7  // Step
-#define CS_PIN           PA4 // Chip select
-#define SW_MOSI          PA7 // Software Master Out Slave In (MOSI)
-#define SW_MISO          PA6 // Software Master In Slave Out (MISO)
-#define SW_SCK           PA5 // Software Slave Clock (SCK)
-#define SW_RX            PA1 // TMC2208/TMC2224 SoftwareSerial receive pin
-#define SW_TX            PA0 // TMC2208/TMC2224 SoftwareSerial transmit pin
+#define EN_PIN    PC11  // Enable
+#define DIR_PIN   PC8   // Direction
+#define STEP_PIN  PC7   // Step
+#define CS_PIN    PA4   // Chip select
+#define SW_MOSI   PA7   // Software Master Out Slave In (MOSI)
+#define SW_MISO   PA6   // Software Master In Slave Out (MISO)
+#define SW_SCK    PA5   // Software Slave Clock (SCK)
+#define SD_MODE   PB14  // SD Mode
+#define SPI_MODE  PB15  // SPI Mode
 
-SPIClass mySPI(SW_MOSI, SW_MISO, SW_SCK);
+#define R_SENSE 0.075f // Watterott TMC5160 uses 0.075
 
-#define SPI mySPI
+// Select your stepper driver type
+  //TMC5160Stepper driver(CS_PIN, R_SENSE);
+  TMC5160Stepper driver(CS_PIN, R_SENSE, SW_MOSI, SW_MISO, SW_SCK);
 
-// Stepper interval time
-const long interval = 160;
-unsigned long previousMillis = 0;
+void setup() {
 
-void setup()
-{
-  pinMode(chipCS, OUTPUT);
-  pinMode(STEPOUT, OUTPUT);
-  pinMode(enable, OUTPUT);
-  digitalWrite(chipCS, HIGH);
-  digitalWrite(enable, HIGH);
-  digitalWrite(STEPOUT, LOW);
+// Configure the pins
+  pinMode(EN_PIN,       OUTPUT);
+  pinMode(STEP_PIN,     OUTPUT);
+  pinMode(DIR_PIN,      OUTPUT);
+  digitalWrite(EN_PIN,  LOW);      // Enable driver in hardware
 
-  SPI.setBitOrder(MSBFIRST);
-  SPI.setClockDivider(SPI_CLOCK_DIV8);
-  SPI.setDataMode(SPI_MODE3);
-  SPI.begin();
-  // init motor
-  // ---------------------
-  SPISendData(0x80, 0x00000080);     // GCONF
-  SPISendData(0xED, 0x00000000);     // SGT
-  SPISendData(0x94, 0x00000040);     // TCOOLTHRS
-  SPISendData(0x89, 0x00010606);     // SHORTCONF
-  SPISendData(0x90, 0x00080303);     // IHOLD_IRUN
-  SPISendData(0xEC, 0x15410153);     // CHOPCONF - microstepping 8
-  SPISendData(0xF0, 0xC40C001E);     // PWMCONF
+// Set the correct MODE 
+  pinMode(SD_MODE,      OUTPUT);
+  digitalWrite(SD_MODE, LOW);
+  pinMode(SPI_MODE,     OUTPUT);
+  digitalWrite(SD_MODE, HIGH);
 
-  // ---------------------
-  digitalWrite(enable, LOW);
+  driver.begin();                 //  SPI: Init CS pins and possible SW SPI pins
+  driver.toff(5);                 // Enables driver in software
+  driver.rms_current(1000);       // Set motor RMS current
+  driver.microsteps(16);          // Set microsteps to 1/16th
+
+//driver.en_pwm_mode(true);       // Toggle stealthChop on TMC2130/2160/5130/5160
+//driver.en_spreadCycle(false);   // Toggle spreadCycle on TMC2208/2209/2224
+  driver.pwm_autoscale(true);     // Needed for stealthChop
 }
 
-void loop()
-{
-  for (uint16_t i = 5000; i > 0; i--) {
-    unsigned long currentMillis = millis();
-    if (currentMillis - previousMillis >= interval) {
-      digitalWrite(STEP_PIN, HIGH);
-    }
-    currentMillis = millis();
-    if (currentMillis - previousMillis >= interval) {
-      digitalWrite(STEP_PIN, LOW);
-    }
+bool direction = LOW;
+
+void loop() {
+  // Set direction
+  digitalWrite(DIR_PIN, direction);
+
+  // Run 50 steps
+  for (uint16_t i = 15000; i > 0; i--) {
+    digitalWrite(STEP_PIN, HIGH);
+    delayMicroseconds(80);
+    digitalWrite(STEP_PIN, LOW);
+    delayMicroseconds(80);
   }
-}
 
-void SPISendData(unsigned long address, unsigned long datagram)
-{
-  //TMC5130 takes 40 bit data: 8 address and 32 data
-  digitalWrite(chipCS, LOW);
-  delayMicroseconds(10);
+  // Change direction
+  direction = (direction == LOW) ? HIGH : LOW;
 
-  SPI.transfer(address);
-  SPI.transfer((datagram >> 24) & 0xff);
-  SPI.transfer((datagram >> 16) & 0xff);
-  SPI.transfer((datagram >> 8) & 0xff);
-  SPI.transfer((datagram) & 0xff);
-  digitalWrite(chipCS, HIGH);
+  delay(1000);
 }
